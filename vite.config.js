@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// GitHub Pages project site is served from /clash3deee/
+// Base relativa: funciona en GitHub Pages sin depender del nombre/caso del repo
 export default defineConfig({
-  base: '/clash3deee/',
+  base: './',
   plugins: [react()],
 })
