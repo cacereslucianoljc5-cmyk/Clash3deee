@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Clash 3D — Arena</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; background: #0b1021; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  #loading {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+    background: #0b1021; color: #cbd5e1; z-index: 20;
+  }
+  #loading .bar { width: 240px; height: 8px; border-radius: 6px; background: #1e293b; overflow: hidden; }
+  #loading .bar > span { display: block; height: 100%; width: 0; background: linear-gradient(90deg,#38bdf8,#818cf8); transition: width .2s; }
+
+  #deck {
+    position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+    display: flex; gap: 8px; padding: 10px 12px; z-index: 10;
+    background: rgba(15,23,42,.82); border: 1px solid rgba(148,163,184,.25);
+    border-radius: 16px; backdrop-filter: blur(8px); max-width: 96vw; overflow-x: auto;
+  }
+  .card {
+    flex: 0 0 auto; min-width: 62px; padding: 8px 6px; border-radius: 12px;
+    background: linear-gradient(180deg,#1e293b,#0f172a); border: 2px solid transparent;
+    color: #e2e8f0; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer;
+    transition: transform .12s, border-color .12s; user-select: none;
+  }
+  .card:hover { transform: translateY(-3px); }
+  .card.active { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,.25); }
+  .card .ico { font-size: 20px; display: block; margin-bottom: 2px; }
+
+  #hint {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    color: #94a3b8; font-size: 13px; background: rgba(15,23,42,.7);
+    padding: 6px 14px; border-radius: 20px; z-index: 10; pointer-events: none;
+  }
+  #toolbar {
+    position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; z-index: 10;
+  }
+  #toolbar button {
+    background: rgba(15,23,42,.82); color: #e2e8f0; border: 1px solid rgba(148,163,184,.25);
+    border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer;
+  }
+  #toolbar button:hover { border-color: #38bdf8; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="loading">
+  <div style="font-size:20px;font-weight:700;color:#e2e8f0">Clash 3D</div>
+  <div class="bar"><span id="progress"></span></div>
+  <div id="loadtext">Cargando arena…</div>
+</div>
+
+<div id="hint">Elige una carta y haz clic en la arena para desplegar</div>
+
+<div id="toolbar">
+  <button id="clearBtn">Limpiar</button>
+  <button id="resetCam">Vista</button>
+</div>
+
+<div id="deck"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// --- Catálogo de unidades ---
+const UNITS = [
+  { key: 'Barbaro',      name: 'Bárbaro',   ico: '⚔️' },
+  { key: 'Arquero',      name: 'Arquero',   ico: '🏹' },
+  { key: 'Esqueleto',    name: 'Esqueleto', ico: '💀' },
+  { key: 'Gigante',      name: 'Gigante',   ico: '🗿' },
+  { key: 'Pekka',        name: 'P.E.K.K.A', ico: '🤖' },
+  { key: 'MagoFuego',    name: 'Mago',      ico: '🔥' },
+  { key: 'Bombardero',   name: 'Bombardero',ico: '💣' },
+  { key: 'MontaPuercos', name: 'Montapuercos', ico: '🐗' },
+  { key: 'Canon',        name: 'Cañón',     ico: '🎯' },
+];
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1021);
+scene.fog = new THREE.Fog(0x0b1021, 60, 140);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 500);
+const DEFAULT_CAM = new THREE.Vector3(0, 34, 42);
+camera.position.copy(DEFAULT_CAM);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.getElementById('app').appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI / 2.05;
+controls.target.set(0, 2, 0);
+
+// --- Luces ---
+scene.add(new THREE.HemisphereLight(0xbcd4ff, 0x223044, 0.9));
+const sun = new THREE.DirectionalLight(0xffffff, 2.0);
+sun.position.set(30, 50, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 200;
+const d = 60;
+sun.shadow.camera.left = -d; sun.shadow.camera.right = d;
+sun.shadow.camera.top = d; sun.shadow.camera.bottom = -d;
+scene.add(sun);
+
+// --- Suelo (plano de despliegue) ---
+const groundGeo = new THREE.PlaneGeometry(400, 400);
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x0e1630, roughness: 1 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const loader = new GLTFLoader();
+const progressEl = document.getElementById('progress');
+const loadText = document.getElementById('loadtext');
+
+function load(url) {
+  return new Promise((res, rej) => loader.load(url, g => res(g), undefined, rej));
+}
+
+// Normaliza un modelo: sombras + escala a una altura objetivo, apoyado en el suelo.
+function normalize(root, targetHeight) {
+  root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  const box = new THREE.Box3().setFromObject(root);
+  const size = new THREE.Vector3(); box.getSize(size);
+  if (targetHeight && size.y > 0) {
+    const s = targetHeight / size.y;
+    root.scale.setScalar(s);
+  }
+  const box2 = new THREE.Box3().setFromObject(root);
+  root.position.y -= box2.min.y; // apoyar en y=0
+  return root;
+}
+
+const cache = {};
+async function getUnit(key, targetHeight) {
+  if (!cache[key]) cache[key] = await load(`models/${key}.glb`);
+  const inst = cache[key].scene.clone(true);
+  return normalize(inst, targetHeight);
+}
+
+const spawned = [];
+function spawnAt(key, x, z, targetHeight = 5) {
+  getUnit(key, targetHeight).then(m => {
+    m.position.x = x; m.position.z = z;
+    m.rotation.y = Math.atan2(-x, -z); // mirar hacia el centro
+    scene.add(m);
+    spawned.push(m);
+  });
+}
+
+// --- Escena base: arena + torres ---
+async function buildBase() {
+  try {
+    const arena = await load('models/Arena.glb');
+    normalize(arena.scene, null);
+    // centrar la arena en el origen en XZ
+    const b = new THREE.Box3().setFromObject(arena.scene);
+    const c = new THREE.Vector3(); b.getCenter(c);
+    arena.scene.position.x -= c.x; arena.scene.position.z -= c.z;
+    arena.scene.position.y -= b.min.y;
+    arena.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    scene.add(arena.scene);
+
+    // encuadrar cámara según tamaño de arena
+    const size = new THREE.Vector3(); b.getSize(size);
+    const reach = Math.max(size.x, size.z);
+    controls.target.set(0, size.y * 0.15, 0);
+    camera.position.set(0, reach * 0.7, reach * 0.85);
+    DEFAULT_CAM.copy(camera.position);
+
+    // Torres del rey en cada extremo
+    const towerH = size.y * 0.35 || 8;
+    const zEdge = size.z * 0.38 || 14;
+    getUnit('TorreRey', towerH).then(t => { t.position.set(0, 0, zEdge); scene.add(t); });
+    getUnit('TorreRey', towerH).then(t => { t.position.set(0, 0, -zEdge); t.rotation.y = Math.PI; scene.add(t); });
+    // Torres pequeñas laterales
+    const sTowerH = towerH * 0.75, xSide = size.x * 0.28 || 10, zSide = zEdge * 0.62;
+    for (const [sx, sz] of [[xSide, zSide], [-xSide, zSide], [xSide, -zSide], [-xSide, -zSide]]) {
+      getUnit('Torre', sTowerH).then(t => { t.position.set(sx, 0, sz); scene.add(t); });
+    }
+  } catch (e) {
+    console.warn('No se pudo cargar la arena, usando plano.', e);
+  }
+}
+
+// --- UI: deck de cartas ---
+let selected = null;
+const deck = document.getElementById('deck');
+UNITS.forEach(u => {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML = `<span class="ico">${u.ico}</span>${u.name}`;
+  el.onclick = () => {
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+    if (selected === u.key) { selected = null; }
+    else { selected = u.key; el.classList.add('active'); }
+  };
+  deck.appendChild(el);
+});
+
+// --- Raycast para colocar unidades ---
+const ray = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+renderer.domElement.addEventListener('pointerdown', ev => {
+  if (!selected || ev.button !== 0) return;
+  mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObject(ground)[0];
+  if (hit) spawnAt(selected, hit.point.x, hit.point.z);
+});
+
+document.getElementById('clearBtn').onclick = () => {
+  spawned.forEach(m => scene.remove(m));
+  spawned.length = 0;
+};
+document.getElementById('resetCam').onclick = () => {
+  camera.position.copy(DEFAULT_CAM);
+  controls.target.set(0, 2, 0);
+};
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// --- Loop ---
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  // leve bob de las unidades desplegadas
+  spawned.forEach((m, i) => { m.position.y = Math.abs(Math.sin(t * 3 + i)) * 0.3; });
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// Arranque
+(async () => {
+  progressEl.style.width = '20%';
+  await buildBase();
+  progressEl.style.width = '100%';
+  loadText.textContent = '¡Listo!';
+  setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 300);
+  animate();
+})();
+</script>
+</body>
+</html>
