@@ -16,3 +16,5 @@ Modelos 3D (formato glTF binario `.glb`) para el proyecto Clash.
 | `models/MontaPuercos.glb` | Montapuercos |
 | `models/Pekka.glb` | P.E.K.K.A |
 | `models/Torre.glb` | Torre |
+| `models/TorreRey.glb` | Torre del Rey |
+| `models/Arena.glb` | Arena |
