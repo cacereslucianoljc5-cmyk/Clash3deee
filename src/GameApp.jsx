@@ -145,6 +145,28 @@ export default function GameApp() {
 
   const canFire = hud.energy >= constants.BLAST_COST;
 
+  // Where the leaderboard is being persisted, for the header badge:
+  //  - global  : Neon is connected -> scores shared across all players/devices
+  //  - temporal : API reachable but DATABASE_URL missing (ephemeral, not global)
+  //  - local    : no backend reachable -> localStorage on this device only
+  const persistence =
+    board.source === 'api'
+      ? board.backend === 'neon'
+        ? {
+            label: '🌐 Global · Neon',
+            cls: 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/30',
+          }
+        : {
+            label: '⚠ Sin base · temporal',
+            cls: 'bg-amber-500/15 text-amber-300 ring-amber-400/30',
+          }
+      : board.source === 'local'
+        ? {
+            label: '💾 Local · este navegador',
+            cls: 'bg-white/10 text-white/50 ring-white/15',
+          }
+        : null;
+
   return (
     <div className="min-h-screen bg-[#05060c] text-white font-[Manrope,sans-serif] flex flex-col">
       {/* Top bar */}
@@ -159,6 +181,14 @@ export default function GameApp() {
               TypeGPU · Solana · Neon
             </p>
           </div>
+          {persistence && (
+            <span
+              title="Estado de persistencia del ranking"
+              className={`ml-1 hidden sm:inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${persistence.cls}`}
+            >
+              {persistence.label}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -401,9 +431,11 @@ export default function GameApp() {
 
           <p className="mt-3 text-[11px] text-white/40 leading-snug">
             {board.source === 'api'
-              ? 'Datos desde Neon (Postgres serverless).'
+              ? board.backend === 'neon'
+                ? 'Ranking global en Neon (Postgres serverless): compartido entre todos los jugadores.'
+                : 'API activa pero sin DATABASE_URL: el ranking es temporal y no se comparte. Configura Neon para hacerlo global.'
               : board.source === 'local'
-                ? 'Sin backend disponible: ranking local (este navegador).'
+                ? 'Sin backend disponible: ranking local de este navegador. Publica la API (Vercel + Neon) para un ranking global.'
                 : ''}
           </p>
         </aside>

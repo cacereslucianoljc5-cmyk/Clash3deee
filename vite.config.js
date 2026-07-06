@@ -10,6 +10,18 @@ function neonDevApi(env) {
       './api/leaderboard-core.js'
     )
     const handler = dispatch === 'users' ? handleUsers : handleLeaderboard
+
+    // CORS parity with the serverless functions (see api/_cors.js).
+    res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*')
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept')
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204
+      res.end()
+      return
+    }
+
     const url = new URL(req.url, 'http://localhost')
     const query = Object.fromEntries(url.searchParams.entries())
 

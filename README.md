@@ -103,8 +103,11 @@ vercel --prod     # despliegue de producción
 
 - **Solo estático (GitHub Pages / cualquier CDN).** `npm run build` genera `dist/`.
   El juego funciona completo; el ranking cae a `localStorage`. Si quieres ranking
-  global desde un sitio estático, despliega la API en Vercel y apunta el cliente
-  con `VITE_API_URL=https://tu-app.vercel.app/api/leaderboard`.
+  **global** desde un sitio estático, despliega la API en Vercel (con `DATABASE_URL`)
+  y apunta el cliente con `VITE_API_URL=https://tu-app.vercel.app/api/leaderboard` y
+  `VITE_USERS_API_URL=https://tu-app.vercel.app/api/users`. La API ya envía cabeceras
+  **CORS** (`Access-Control-Allow-Origin`, configurable con `CORS_ORIGIN`), así que el
+  fetch cross-origin desde tu dominio estático funciona.
 
 ## Variables de entorno
 
@@ -115,6 +118,7 @@ vercel --prod     # despliegue de producción
 | `VITE_SOLANA_CLUSTER` | Cluster mostrado en la UI. | `devnet` |
 | `VITE_API_URL` | URL de la API de ranking. | `/api/leaderboard` |
 | `VITE_USERS_API_URL` | URL de la API de usuarios. | `/api/users` |
+| `CORS_ORIGIN` | Origen permitido por la API (lado servidor). Útil si sirves el frontend estático desde otro dominio. | `*` |
 
 ## Notas
 

@@ -32,12 +32,13 @@ export async function fetchLeaderboard(limit = 20) {
     });
     if (!resp.ok) throw new Error(`API ${resp.status}`);
     const data = await resp.json();
-    return { source: 'api', scores: data.scores || [] };
+    // backend: 'neon' (global & durable) | 'memory' (API up but no DATABASE_URL)
+    return { source: 'api', backend: data.backend || null, scores: data.scores || [] };
   } catch (_) {
     const rows = readLocal()
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
-    return { source: 'local', scores: rows };
+    return { source: 'local', backend: null, scores: rows };
   }
 }
 

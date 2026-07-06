@@ -25,6 +25,13 @@ async function getSql() {
   return neonSql;
 }
 
+// Which persistence backend is active. 'neon' => scores are truly global and
+// durable; 'memory' => DATABASE_URL is not set, so data is ephemeral (per
+// serverless instance) and NOT global. Surfaced to the UI so players can tell.
+export function getBackend() {
+  return process.env.DATABASE_URL ? 'neon' : 'memory';
+}
+
 async function ensureTables(sql) {
   if (!neonReady) {
     neonReady = (async () => {
@@ -217,7 +224,7 @@ export async function handleLeaderboard({ method, query, body }) {
   try {
     if (method === 'GET') {
       const scores = await getTopScores(query?.limit);
-      return { status: 200, json: { scores } };
+      return { status: 200, json: { scores, backend: getBackend() } };
     }
     if (method === 'POST') {
       const result = await submitScore(body || {});

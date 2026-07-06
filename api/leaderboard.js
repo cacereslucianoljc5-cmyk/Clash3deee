@@ -7,8 +7,11 @@
 // DATABASE_URL environment variable to your Neon connection string.
 
 import { handleLeaderboard } from './leaderboard-core.js';
+import { applyCors } from './_cors.js';
 
 export default async function handler(req, res) {
+  if (applyCors(req, res)) return; // handled OPTIONS preflight
+
   // Body may arrive parsed (Vercel) or as a raw string.
   let body = req.body;
   if (typeof body === 'string') {
