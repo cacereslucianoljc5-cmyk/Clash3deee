@@ -1,0 +1,11 @@
+{
+  "//": "Config de ejemplo para conectar un cliente MCP al Neon MCP Server.",
+  "//local": "Opción local vía npx: reemplazá ${NEON_API_KEY} por tu env var.",
+  "//remoto": "Opción remota: usá la URL de mcp.neon.tech con OAuth en lugar de command/args.",
+  "mcpServers": {
+    "neon": {
+      "command": "npx",
+      "args": ["-y", "@neondatabase/mcp-server-neon", "start", "${NEON_API_KEY}"]
+    }
+  }
+}
