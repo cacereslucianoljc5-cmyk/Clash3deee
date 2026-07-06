@@ -65,11 +65,35 @@ Todo (JS y CSS) queda embebido en un único `index.html` que se abre con doble
 clic en Chrome/Edge (113+) con WebGPU. `file://` es contexto seguro, así que
 WebGPU funciona sin servidor; el ranking cae a `localStorage` en este modo.
 
-## Despliegue
+## Despliegue en Vercel (recomendado)
 
-- **Stack completo (con ranking en Neon): Vercel.** Importa el repo, define
-  `DATABASE_URL` en las variables de entorno y la función [`api/leaderboard.js`](api/leaderboard.js)
-  queda disponible en `/api/leaderboard`.
+El repo está listo para Vercel *sin configuración extra* ([`vercel.json`](vercel.json)
+fija el preset de Vite; la función [`api/leaderboard.js`](api/leaderboard.js) se
+detecta sola en `/api/leaderboard`).
+
+**Un clic:**
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/cacereslucianoljc5-cmyk/Clash3deee/tree/claude/vite-typegpu-solana-game-xfkuhh&env=DATABASE_URL&envDescription=Cadena%20de%20conexi%C3%B3n%20de%20Neon%20para%20el%20ranking%20(opcional))
+
+**Manual:**
+
+1. En [vercel.com/new](https://vercel.com/new) importa `cacereslucianoljc5-cmyk/Clash3deee`
+   y elige la rama `claude/vite-typegpu-solana-game-xfkuhh`.
+2. Framework: **Vite** (autodetectado). Build `npm run build`, output `dist`.
+3. (Opcional) Añade la variable `DATABASE_URL` con tu cadena de Neon para el
+   ranking global. Sin ella, el ranking usa `localStorage`.
+4. **Deploy**. Obtendrás una URL `https://<tu-proyecto>.vercel.app`.
+
+**CLI (desde tu máquina):**
+
+```bash
+npm i -g vercel
+vercel            # despliegue de preview
+vercel --prod     # despliegue de producción
+```
+
+### Otras opciones
+
 - **Solo estático (GitHub Pages / cualquier CDN).** `npm run build` genera `dist/`.
   El juego funciona completo; el ranking cae a `localStorage`. Si quieres ranking
   global desde un sitio estático, despliega la API en Vercel y apunta el cliente
