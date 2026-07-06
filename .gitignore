@@ -2,8 +2,3 @@ node_modules
 dist
 *.local
 .DS_Store
-
-# variables de entorno (NUNCA subir keys)
-.env
-.env.*
-!.env.example
