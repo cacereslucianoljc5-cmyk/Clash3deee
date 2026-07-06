@@ -8,6 +8,9 @@ on:
       - claude/web-page-github-376yuj
   workflow_dispatch:
 
+env:
+  FLY_APP_NAME: clash3deee
+
 jobs:
   deploy:
     name: Deploy app
@@ -18,6 +21,13 @@ jobs:
 
       - name: Set up flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Create the app on first run. Harmless (|| true) once it exists.
+      # Requires the token to have permission to create apps in the org.
+      - name: Ensure app exists
+        run: flyctl apps create "$FLY_APP_NAME" --org personal || true
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Deploy
         run: flyctl deploy --remote-only
