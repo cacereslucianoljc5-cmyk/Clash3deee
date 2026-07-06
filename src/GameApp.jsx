@@ -10,7 +10,12 @@ import {
   hasWallet,
   CLUSTER,
 } from './solana/wallet.js';
-import { fetchLeaderboard, submitScore } from './db/leaderboard.js';
+import {
+  connectUser,
+  renameUser,
+  submitScore,
+  fetchLeaderboard,
+} from './db/api.js';
 
 function Bar({ label, value, max, color }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
@@ -35,16 +40,27 @@ export default function GameApp() {
   const { phase, error, hud, finalScore, startGame, fireAt, constants } =
     useGame(canvasRef);
 
-  // --- wallet state -------------------------------------------------------
+  // --- wallet + user state ------------------------------------------------
   const [wallet, setWallet] = useState(null); // { provider, publicKey }
   const [balance, setBalance] = useState(null);
   const [walletErr, setWalletErr] = useState('');
+  const [profile, setProfile] = useState(null); // { username, bestScore, games, source }
+  const [connecting, setConnecting] = useState(false);
+  const refreshBoardRef = useRef(null);
 
   const onConnect = useCallback(async () => {
     setWalletErr('');
+    setConnecting(true);
     try {
       const w = await walletConnect();
       setWallet(w);
+      // Create/refresh the Neon user for this wallet.
+      try {
+        const p = await connectUser({ wallet: w.publicKey });
+        setProfile(p);
+      } catch (_) {
+        setProfile(null);
+      }
       try {
         setBalance(await getBalance(w.publicKey));
       } catch (_) {
@@ -52,6 +68,8 @@ export default function GameApp() {
       }
     } catch (err) {
       setWalletErr(err.message || 'No se pudo conectar la wallet.');
+    } finally {
+      setConnecting(false);
     }
   }, []);
 
@@ -59,7 +77,26 @@ export default function GameApp() {
     await walletDisconnect();
     setWallet(null);
     setBalance(null);
+    setProfile(null);
   }, []);
+
+  // --- username editing ---------------------------------------------------
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+
+  const startEditName = useCallback(() => {
+    setNameDraft(profile?.username || '');
+    setEditingName(true);
+  }, [profile]);
+
+  const saveName = useCallback(async () => {
+    const name = nameDraft.trim();
+    setEditingName(false);
+    if (!wallet || !name || name === profile?.username) return;
+    const p = await renameUser({ wallet: wallet.publicKey, username: name });
+    setProfile(p);
+    refreshBoardRef.current?.();
+  }, [nameDraft, wallet, profile]);
 
   // --- leaderboard --------------------------------------------------------
   const [board, setBoard] = useState({ source: null, scores: [] });
@@ -71,6 +108,7 @@ export default function GameApp() {
     setBoard(res);
     setLoadingBoard(false);
   }, []);
+  refreshBoardRef.current = refreshBoard;
 
   useEffect(() => {
     refreshBoard();
@@ -90,15 +128,21 @@ export default function GameApp() {
       );
     }
     await submitScore({
-      name: wallet ? shortAddress(wallet.publicKey) : 'anon',
-      score: finalScore,
       wallet: wallet?.publicKey || null,
+      username: profile?.username || (wallet ? shortAddress(wallet.publicKey) : 'anon'),
+      score: finalScore,
       signature,
     });
     submittedForRef.current = finalScore;
     setSubmitState('done');
+    // Reflect the new best score in the header profile.
+    if (profile && finalScore > (profile.bestScore || 0)) {
+      setProfile((p) => (p ? { ...p, bestScore: finalScore, games: (p.games || 0) + 1 } : p));
+    } else if (profile) {
+      setProfile((p) => (p ? { ...p, games: (p.games || 0) + 1 } : p));
+    }
     refreshBoard();
-  }, [wallet, finalScore, refreshBoard]);
+  }, [wallet, finalScore, profile, refreshBoard]);
 
   // reset submit state when a new game-over happens
   useEffect(() => {
@@ -136,11 +180,31 @@ export default function GameApp() {
           {wallet ? (
             <div className="flex items-center gap-2 text-sm">
               <div className="text-right leading-tight">
-                <div className="font-mono text-emerald-300">
-                  {shortAddress(wallet.publicKey)}
-                </div>
+                {editingName ? (
+                  <input
+                    autoFocus
+                    value={nameDraft}
+                    maxLength={24}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onBlur={saveName}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveName();
+                      if (e.key === 'Escape') setEditingName(false);
+                    }}
+                    className="w-32 bg-white/10 rounded px-2 py-0.5 text-right outline-none focus:ring-1 focus:ring-emerald-400"
+                  />
+                ) : (
+                  <button
+                    onClick={startEditName}
+                    title="Editar nombre"
+                    className="font-semibold text-emerald-300 hover:text-emerald-200"
+                  >
+                    {profile?.username || shortAddress(wallet.publicKey)} <span className="text-white/30 text-xs">✎</span>
+                  </button>
+                )}
                 <div className="text-[11px] text-white/50">
-                  {balance != null ? `${balance.toFixed(3)} SOL` : '—'} · {CLUSTER}
+                  {profile ? `★ ${profile.bestScore ?? 0} · ${profile.games ?? 0} partidas · ` : ''}
+                  {balance != null ? `${balance.toFixed(2)} SOL` : '—'}
                 </div>
               </div>
               <button
@@ -153,9 +217,10 @@ export default function GameApp() {
           ) : (
             <button
               onClick={onConnect}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:brightness-110 text-sm font-semibold"
+              disabled={connecting}
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:brightness-110 text-sm font-semibold disabled:opacity-60"
             >
-              {hasWallet() ? 'Conectar wallet' : 'Instalar Phantom'}
+              {connecting ? 'Conectando…' : hasWallet() ? 'Conectar wallet' : 'Instalar Phantom'}
             </button>
           )}
         </div>

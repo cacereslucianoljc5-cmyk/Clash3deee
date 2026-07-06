@@ -11,7 +11,7 @@ Integra tres piezas:
 | --- | --- | --- |
 | **TypeGPU / WebGPU** | Simulación de ~24 000 partículas (movimiento, colisiones, puntuación) en *compute shaders*, y render instanciado. | [`src/game/`](src/game) |
 | **Solana** | Conectar wallet (Phantom/Solflare/Backpack), leer balance en devnet y **firmar** la puntuación. | [`src/solana/wallet.js`](src/solana/wallet.js) |
-| **Neon (Postgres serverless)** | Ranking global persistente vía función serverless. | [`api/`](api) · [`db/schema.sql`](db/schema.sql) |
+| **Neon (Postgres serverless)** | Usuarios (identidad = wallet) y ranking global persistente vía funciones serverless. | [`api/`](api) · [`db/schema.sql`](db/schema.sql) |
 
 ## Cómo funciona
 
@@ -26,11 +26,16 @@ Integra tres piezas:
 - **Solana.** Sin dependencias pesadas: se habla directamente con el proveedor
   inyectado (`window.solana`, etc.) y con el RPC por `fetch`. Al terminar la
   partida, la puntuación se **firma** con la wallet antes de enviarse.
-- **Neon.** El mismo *handler* ([`api/leaderboard-core.js`](api/leaderboard-core.js))
-  se sirve como función serverless de Vercel y como *middleware* del dev server de
-  Vite. Si `DATABASE_URL` está definido, persiste en Neon; si no, usa un almacén en
-  memoria. El cliente además cae a `localStorage` si la API no está disponible
-  (p. ej. hosting estático).
+- **Neon — usuarios y puntuaciones.** La identidad es la **dirección de wallet**:
+  al conectar, [`api/user.js`](api/user.js) hace *upsert* de un usuario (nombre
+  editable en la UI, clic sobre el nombre en la barra superior). Cada partida
+  se guarda en `scores` ligada a esa wallet vía [`api/leaderboard.js`](api/leaderboard.js).
+  Toda la lógica de datos vive en [`api/db.js`](api/db.js), compartido por las
+  funciones serverless de Vercel y por el *middleware* del dev server de Vite.
+  Si `DATABASE_URL` está definido, persiste en Neon (tablas `users` + `scores`,
+  ver [`db/schema.sql`](db/schema.sql)); si no, usa un almacén en memoria. El
+  cliente ([`src/db/api.js`](src/db/api.js)) además cae a `localStorage` si la
+  API no está disponible (p. ej. hosting estático).
 
 ## Desarrollo local
 
@@ -68,8 +73,9 @@ WebGPU funciona sin servidor; el ranking cae a `localStorage` en este modo.
 ## Despliegue en Vercel (recomendado)
 
 El repo está listo para Vercel *sin configuración extra* ([`vercel.json`](vercel.json)
-fija el preset de Vite; la función [`api/leaderboard.js`](api/leaderboard.js) se
-detecta sola en `/api/leaderboard`).
+fija el preset de Vite; las funciones [`api/user.js`](api/user.js) y
+[`api/leaderboard.js`](api/leaderboard.js) se detectan solas en `/api/user` y
+`/api/leaderboard`).
 
 **Un clic:**
 

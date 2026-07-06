@@ -1,29 +1,19 @@
 // Vercel serverless function: /api/leaderboard
 //
-// GET  -> { scores: [...] }
-// POST -> body { name, score, wallet?, signature? } -> { ok: true }
+// GET  ?limit=N                                  -> { scores: [...] } (mejor por usuario)
+// POST { wallet?, username?, score, signature? } -> guarda la puntuación
 //
-// Deploy this project to Vercel (or any Node serverless host) and set the
-// DATABASE_URL environment variable to your Neon connection string.
+// Despliega el proyecto en Vercel y define DATABASE_URL con tu cadena de Neon.
 
-import { handleLeaderboard } from './leaderboard-core.js';
+import { getTopScores, submitScore } from './db.js';
+import { parseBody, send } from './_http.js';
 
 export default async function handler(req, res) {
-  // Body may arrive parsed (Vercel) or as a raw string.
-  let body = req.body;
-  if (typeof body === 'string') {
-    try {
-      body = JSON.parse(body || '{}');
-    } catch (_) {
-      body = {};
-    }
+  if (req.method === 'GET') {
+    return send(res, getTopScores(req.query?.limit).then((scores) => ({ scores })));
   }
-
-  const { status, json } = await handleLeaderboard({
-    method: req.method,
-    query: req.query || {},
-    body,
-  });
-
-  res.status(status).json(json);
+  if (req.method === 'POST') {
+    return send(res, submitScore(parseBody(req)));
+  }
+  res.status(405).json({ error: 'Method not allowed' });
 }
