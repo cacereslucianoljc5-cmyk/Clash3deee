@@ -55,6 +55,16 @@ npm run preview  # sirve la build localmente
 Sin `DATABASE_URL`, el juego es igualmente jugable: el ranking usa un almacén en
 memoria (dev) o `localStorage` (estático).
 
+### Archivo único (abrir con doble clic)
+
+```bash
+npm run build:single   # genera dist-single/index.html autocontenido
+```
+
+Todo (JS y CSS) queda embebido en un único `index.html` que se abre con doble
+clic en Chrome/Edge (113+) con WebGPU. `file://` es contexto seguro, así que
+WebGPU funciona sin servidor; el ranking cae a `localStorage` en este modo.
+
 ## Despliegue
 
 - **Stack completo (con ranking en Neon): Vercel.** Importa el repo, define
