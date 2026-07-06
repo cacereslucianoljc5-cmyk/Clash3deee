@@ -2,3 +2,9 @@ node_modules
 dist
 *.local
 .DS_Store
+
+# Variables de entorno con secretos (¡nunca commitear!)
+.env
+.env.*
+!.env.example
+.vercel

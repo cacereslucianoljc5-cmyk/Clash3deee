@@ -291,6 +291,103 @@ function GhostButton({ children, href = "#" }) {
   );
 }
 
+/* ---------- WhitelistForm: registra correos vía /api/whitelist (Neon) ---------- */
+function WhitelistForm() {
+  const [email, setEmail] = useState("");
+  const [website, setWebsite] = useState(""); // honeypot anti-bots (oculto)
+  const [status, setStatus] = useState("idle"); // idle | loading | ok | already | error
+  const [message, setMessage] = useState("");
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    if (status === "loading") return;
+    setStatus("loading");
+    setMessage("");
+    try {
+      const res = await fetch("/api/whitelist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, website }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setStatus("error");
+        setMessage(data.error || "No se pudo registrar. Intentá de nuevo.");
+        return;
+      }
+      setStatus(data.already ? "already" : "ok");
+      setMessage(
+        data.already
+          ? "Ese correo ya estaba en la lista. ¡Ya sos parte del asedio!"
+          : "¡Reclutado! Te avisaremos en el lanzamiento."
+      );
+      setEmail("");
+    } catch {
+      setStatus("error");
+      setMessage("Error de red. Revisá tu conexión e intentá de nuevo.");
+    }
+  }
+
+  const done = status === "ok" || status === "already";
+
+  return (
+    <form onSubmit={onSubmit} className="mt-8 max-w-md mx-auto w-full">
+      <div className="flex flex-col sm:flex-row items-stretch gap-3">
+        {/* honeypot: oculto para humanos, tentador para bots */}
+        <input
+          type="text"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
+          aria-hidden="true"
+        />
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="tu@correo.com"
+          disabled={done}
+          className="font-body flex-1 px-5 py-3 rounded-xl outline-none"
+          style={{
+            background: "rgba(240,230,210,0.05)",
+            border: `1px solid ${C.line}`,
+            color: C.parchment,
+          }}
+        />
+        <button
+          type="submit"
+          disabled={status === "loading" || done}
+          className="font-display px-7 py-3 rounded-xl text-base whitespace-nowrap"
+          style={{
+            background: C.gold,
+            color: C.bg,
+            fontWeight: 700,
+            opacity: status === "loading" || done ? 0.65 : 1,
+            cursor: status === "loading" || done ? "default" : "pointer",
+          }}
+        >
+          {status === "loading" ? "Reclutando…" : done ? "✓ En la lista" : "Unirme a la whitelist"}
+        </button>
+      </div>
+      {message && (
+        <p
+          className="font-mono text-xs mt-3"
+          style={{ color: status === "error" ? C.ember : C.goldBright }}
+        >
+          {message}
+        </p>
+      )}
+      <p className="font-mono text-xs mt-3" style={{ color: C.parchmentDim, opacity: 0.6 }}>
+        Solo usamos tu correo para avisarte del lanzamiento. Sin spam.
+      </p>
+    </form>
+  );
+}
+
 /* ---------- datos de contenido ---------- */
 const ROSTER = [
   { img: IMG.archer, name: "Arquera de la Capucha", rarity: "Común", rarityColor: C.parchmentDim, desc: "Ataca desde lejos y nunca falla un flash pump." },
@@ -558,7 +655,16 @@ export default function App() {
           <p className="font-body mt-4 max-w-xl mx-auto" style={{ color: C.parchmentDim }}>
             Únete antes de que caiga el primer castillo. Recluta tu tropa, entra al servidor y sigue la ruta al trono.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
+
+          <p className="font-mono text-xs uppercase mt-10" style={{ color: C.violet, letterSpacing: "0.2em" }}>
+            Lista de reclutamiento
+          </p>
+          <p className="font-body mt-2 max-w-lg mx-auto" style={{ color: C.parchmentDim }}>
+            Deja tu correo y sé de los primeros en enterarte cuando se publique el contrato.
+          </p>
+          <WhitelistForm />
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10">
             <GoldButton href="#">Comprar $SIEGE</GoldButton>
             <GhostButton href="#">Unirse al Telegram</GhostButton>
           </div>
