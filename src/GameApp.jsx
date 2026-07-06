@@ -11,6 +11,7 @@ import {
   CLUSTER,
 } from './solana/wallet.js';
 import { fetchLeaderboard, submitScore } from './db/leaderboard.js';
+import { registerUser, fetchUser, recordLocalRun } from './db/users.js';
 
 function Bar({ label, value, max, color }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
@@ -35,10 +36,13 @@ export default function GameApp() {
   const { phase, error, hud, finalScore, startGame, fireAt, constants } =
     useGame(canvasRef);
 
-  // --- wallet state -------------------------------------------------------
+  // --- wallet + user state ------------------------------------------------
   const [wallet, setWallet] = useState(null); // { provider, publicKey }
   const [balance, setBalance] = useState(null);
   const [walletErr, setWalletErr] = useState('');
+  const [user, setUser] = useState(null); // { name, games_played, best_score, ... }
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [userSource, setUserSource] = useState(null); // 'api' | 'local'
 
   const onConnect = useCallback(async () => {
     setWalletErr('');
@@ -50,6 +54,18 @@ export default function GameApp() {
       } catch (_) {
         setBalance(null);
       }
+      // Create (or refresh) the user tied to this wallet in Neon.
+      try {
+        const { source, user: u } = await registerUser({
+          wallet: w.publicKey,
+          name: shortAddress(w.publicKey),
+        });
+        setUser(u);
+        setUserSource(source);
+        setIsNewUser(!!u?.isNew);
+      } catch (_) {
+        setUser(null);
+      }
     } catch (err) {
       setWalletErr(err.message || 'No se pudo conectar la wallet.');
     }
@@ -59,6 +75,9 @@ export default function GameApp() {
     await walletDisconnect();
     setWallet(null);
     setBalance(null);
+    setUser(null);
+    setIsNewUser(false);
+    setUserSource(null);
   }, []);
 
   // --- leaderboard --------------------------------------------------------
@@ -89,8 +108,8 @@ export default function GameApp() {
         `Siege Kingdoms score: ${finalScore} @ ${new Date().toISOString()}`,
       );
     }
-    await submitScore({
-      name: wallet ? shortAddress(wallet.publicKey) : 'anon',
+    const res = await submitScore({
+      name: user?.name || (wallet ? shortAddress(wallet.publicKey) : 'anon'),
       score: finalScore,
       wallet: wallet?.publicKey || null,
       signature,
@@ -98,7 +117,17 @@ export default function GameApp() {
     submittedForRef.current = finalScore;
     setSubmitState('done');
     refreshBoard();
-  }, [wallet, finalScore, refreshBoard]);
+
+    // Refresh this user's aggregate stats (best score, games played).
+    if (wallet?.publicKey) {
+      if (res.source === 'local') recordLocalRun(wallet.publicKey, finalScore);
+      const { source, user: u } = await fetchUser(wallet.publicKey);
+      if (u) {
+        setUser(u);
+        setUserSource(source);
+      }
+    }
+  }, [wallet, user, finalScore, refreshBoard]);
 
   // reset submit state when a new game-over happens
   useEffect(() => {
@@ -282,8 +311,43 @@ export default function GameApp() {
           )}
         </section>
 
-        {/* Sidebar: leaderboard */}
+        {/* Sidebar: profile + leaderboard */}
         <aside className="lg:w-80 rounded-2xl border border-white/10 bg-white/[0.02] p-4 flex flex-col">
+          {/* Player profile (created in Neon on wallet connect) */}
+          {user && (
+            <div className="mb-4 rounded-xl border border-violet-400/20 bg-violet-500/5 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-widest text-white/50">
+                  {isNewUser ? '✨ Nuevo jugador' : '👤 Jugador'}
+                </span>
+                <span className="text-[10px] text-white/40">
+                  {userSource === 'api' ? 'Neon' : 'local'}
+                </span>
+              </div>
+              <div className="mt-1 font-mono text-sm text-emerald-300 truncate">
+                {user.name}
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                <div className="rounded-lg bg-white/[0.04] py-2">
+                  <div className="text-lg font-bold tabular-nums text-emerald-300">
+                    {user.best_score ?? 0}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/40">
+                    Mejor
+                  </div>
+                </div>
+                <div className="rounded-lg bg-white/[0.04] py-2">
+                  <div className="text-lg font-bold tabular-nums">
+                    {user.games_played ?? 0}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/40">
+                    Partidas
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold tracking-tight">🏆 Ranking</h3>
             <button
@@ -304,7 +368,11 @@ export default function GameApp() {
                 {board.scores.map((row, i) => (
                   <li
                     key={i}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.03]"
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg ${
+                      wallet && row.wallet === wallet.publicKey
+                        ? 'bg-violet-500/15 ring-1 ring-violet-400/30'
+                        : 'bg-white/[0.03]'
+                    }`}
                   >
                     <span
                       className={`w-6 text-center font-bold ${

@@ -11,7 +11,7 @@ Integra tres piezas:
 | --- | --- | --- |
 | **TypeGPU / WebGPU** | Simulación de ~24 000 partículas (movimiento, colisiones, puntuación) en *compute shaders*, y render instanciado. | [`src/game/`](src/game) |
 | **Solana** | Conectar wallet (Phantom/Solflare/Backpack), leer balance en devnet y **firmar** la puntuación. | [`src/solana/wallet.js`](src/solana/wallet.js) |
-| **Neon (Postgres serverless)** | Ranking global persistente vía función serverless. | [`api/`](api) · [`db/schema.sql`](db/schema.sql) |
+| **Neon (Postgres serverless)** | **Usuarios** (uno por wallet, con sus stats) y ranking global persistente vía funciones serverless. | [`api/`](api) · [`db/schema.sql`](db/schema.sql) |
 
 ## Cómo funciona
 
@@ -24,13 +24,20 @@ Integra tres piezas:
   un *billboard* aditivo. Ver [`src/game/shaders.js`](src/game/shaders.js) y
   [`src/game/renderer.js`](src/game/renderer.js).
 - **Solana.** Sin dependencias pesadas: se habla directamente con el proveedor
-  inyectado (`window.solana`, etc.) y con el RPC por `fetch`. Al terminar la
-  partida, la puntuación se **firma** con la wallet antes de enviarse.
+  inyectado (`window.solana`, etc.) y con el RPC por `fetch`. Al **conectar** la
+  wallet se crea (o refresca) su **usuario** en Neon; al terminar la partida, la
+  puntuación se **firma** con la wallet antes de enviarse.
+- **Usuarios.** Cada wallet que se conecta se registra como usuario (`POST
+  /api/users`), identificado por su dirección. La tabla `users` guarda su nombre y
+  sus estadísticas agregadas (`best_score`, `games_played`), que se actualizan en
+  cada envío de puntuación. La UI muestra el perfil del jugador y resalta su fila
+  en el ranking.
 - **Neon.** El mismo *handler* ([`api/leaderboard-core.js`](api/leaderboard-core.js))
-  se sirve como función serverless de Vercel y como *middleware* del dev server de
-  Vite. Si `DATABASE_URL` está definido, persiste en Neon; si no, usa un almacén en
-  memoria. El cliente además cae a `localStorage` si la API no está disponible
-  (p. ej. hosting estático).
+  se sirve como funciones serverless de Vercel (`/api/leaderboard`, `/api/users`) y
+  como *middleware* del dev server de Vite. Si `DATABASE_URL` está definido,
+  persiste en Neon (tablas `users` y `scores`); si no, usa un almacén en memoria. El
+  cliente además cae a `localStorage` si la API no está disponible (p. ej. hosting
+  estático).
 
 ## Desarrollo local
 
@@ -39,7 +46,7 @@ aceleración por hardware.
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173  (incluye /api/leaderboard)
+npm run dev      # http://localhost:5173  (incluye /api/leaderboard y /api/users)
 npm run build    # build de producción en dist/
 npm run preview  # sirve la build localmente
 ```
@@ -107,6 +114,7 @@ vercel --prod     # despliegue de producción
 | `VITE_SOLANA_RPC` | Endpoint RPC de Solana. | `https://api.devnet.solana.com` |
 | `VITE_SOLANA_CLUSTER` | Cluster mostrado en la UI. | `devnet` |
 | `VITE_API_URL` | URL de la API de ranking. | `/api/leaderboard` |
+| `VITE_USERS_API_URL` | URL de la API de usuarios. | `/api/users` |
 
 ## Notas
 
