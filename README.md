@@ -1,33 +1,129 @@
-# ⚔ Siege Kingdoms — $SIEGE
+# ⚔️ Siege Kingdoms — GPU Siege
 
-Landing page de la memecoin **Siege Kingdoms**, construida con **React + Vite**.
+Juego web **WebGPU** construido con **Vite + React**, en el que miles de invasores
+se simulan **enteramente en la GPU con [TypeGPU](https://typegpu.com)** y avanzan
+hacia tu castillo. Haces clic para lanzar ondas de choque y destruirlos antes de
+que rompan la muralla.
 
-La interfaz vive en un único componente: [`src/App.jsx`](src/App.jsx). Usa
-utilidades de Tailwind (vía Play CDN) para el layout, fuentes de Google
-(Baloo 2 / Manrope / Space Mono) y varios efectos de animación
-(BlurText, ScrollReveal, Marquee, CountUp, tarjetas con tilt, etc.).
+Integra tres piezas:
+
+| Pieza | Para qué | Dónde |
+| --- | --- | --- |
+| **TypeGPU / WebGPU** | Simulación de ~24 000 partículas (movimiento, colisiones, puntuación) en *compute shaders*, y render instanciado. | [`src/game/`](src/game) |
+| **Solana** | Conectar wallet (Phantom/Solflare/Backpack), leer balance en devnet y **firmar** la puntuación. | [`src/solana/wallet.js`](src/solana/wallet.js) |
+| **Neon (Postgres serverless)** | Usuarios (identidad = wallet) y ranking global persistente vía funciones serverless. | [`api/`](api) · [`db/schema.sql`](db/schema.sql) |
+
+## Cómo funciona
+
+- **GPU (TypeGPU).** `initFromDevice` monta un `TgpuRoot` sobre un `GPUDevice`
+  propio (reteniendo el `GPUAdapter` para evitar pérdidas de device). Los buffers
+  tipados (`d.struct`, `d.arrayOf`) describen partículas, parámetros y ondas de
+  choque; un *compute shader* (`initMain`/`simMain`) mueve cada partícula, resuelve
+  colisiones y acumula puntuación y brechas en un buffer atómico que se lee de
+  vuelta a la CPU de forma asíncrona. Un *render pass* dibuja cada partícula como
+  un *billboard* aditivo. Ver [`src/game/shaders.js`](src/game/shaders.js) y
+  [`src/game/renderer.js`](src/game/renderer.js).
+- **Solana.** Sin dependencias pesadas: se habla directamente con el proveedor
+  inyectado (`window.solana`, etc.) y con el RPC por `fetch`. Al terminar la
+  partida, la puntuación se **firma** con la wallet antes de enviarse.
+- **Neon — usuarios y puntuaciones.** La identidad es la **dirección de wallet**:
+  al conectar, [`api/user.js`](api/user.js) hace *upsert* de un usuario (nombre
+  editable en la UI, clic sobre el nombre en la barra superior). Cada partida
+  se guarda en `scores` ligada a esa wallet vía [`api/leaderboard.js`](api/leaderboard.js).
+  Toda la lógica de datos vive en [`api/db.js`](api/db.js), compartido por las
+  funciones serverless de Vercel y por el *middleware* del dev server de Vite.
+  Si `DATABASE_URL` está definido, persiste en Neon (tablas `users` + `scores`,
+  ver [`db/schema.sql`](db/schema.sql)); si no, usa un almacén en memoria. El
+  cliente ([`src/db/api.js`](src/db/api.js)) además cae a `localStorage` si la
+  API no está disponible (p. ej. hosting estático).
 
 ## Desarrollo local
 
+Requiere un navegador con **WebGPU** (Chrome/Edge 113+, o Firefox reciente) con
+aceleración por hardware.
+
 ```bash
 npm install
-npm run dev      # servidor de desarrollo
-npm run build    # genera la versión de producción en dist/
+npm run dev      # http://localhost:5173  (incluye /api/leaderboard)
+npm run build    # build de producción en dist/
 npm run preview  # sirve la build localmente
 ```
 
-## Despliegue
+### Ranking con Neon (opcional)
 
-Cada push a la rama `claude/web-page-github-376yuj` dispara el workflow
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), que compila el
-sitio y lo publica en **GitHub Pages**:
+1. Crea una base de datos en [Neon](https://neon.tech) y copia la cadena de
+   conexión.
+2. Copia `.env.example` a `.env` y rellena `DATABASE_URL`.
+3. `npm run dev` ya persistirá las puntuaciones en Neon (la tabla se crea sola;
+   ver [`db/schema.sql`](db/schema.sql) como referencia).
 
-<https://cacereslucianoljc5-cmyk.github.io/clash3deee/>
+Sin `DATABASE_URL`, el juego es igualmente jugable: el ranking usa un almacén en
+memoria (dev) o `localStorage` (estático).
 
-> Nota: `vite.config.js` fija `base: '/clash3deee/'` para que las rutas de los
-> assets funcionen bajo el subdirectorio del repositorio en GitHub Pages.
+### Archivo único (abrir con doble clic)
+
+```bash
+npm run build:single   # genera dist-single/index.html autocontenido
+```
+
+Todo (JS y CSS) queda embebido en un único `index.html` que se abre con doble
+clic en Chrome/Edge (113+) con WebGPU. `file://` es contexto seguro, así que
+WebGPU funciona sin servidor; el ranking cae a `localStorage` en este modo.
+
+## Despliegue en Vercel (recomendado)
+
+El repo está listo para Vercel *sin configuración extra* ([`vercel.json`](vercel.json)
+fija el preset de Vite; las funciones [`api/user.js`](api/user.js) y
+[`api/leaderboard.js`](api/leaderboard.js) se detectan solas en `/api/user` y
+`/api/leaderboard`).
+
+**Un clic:**
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/cacereslucianoljc5-cmyk/Clash3deee/tree/claude/vite-typegpu-solana-game-xfkuhh&env=DATABASE_URL&envDescription=Cadena%20de%20conexi%C3%B3n%20de%20Neon%20para%20el%20ranking%20(opcional))
+
+**Manual:**
+
+1. En [vercel.com/new](https://vercel.com/new) importa `cacereslucianoljc5-cmyk/Clash3deee`
+   y elige la rama `claude/vite-typegpu-solana-game-xfkuhh`.
+2. Framework: **Vite** (autodetectado). Build `npm run build`, output `dist`.
+3. (Opcional) Añade la variable `DATABASE_URL` con tu cadena de Neon para el
+   ranking global. Sin ella, el ranking usa `localStorage`.
+4. **Deploy**. Obtendrás una URL `https://<tu-proyecto>.vercel.app`.
+
+**CLI (desde tu máquina):**
+
+```bash
+npm i -g vercel
+vercel            # despliegue de preview
+vercel --prod     # despliegue de producción
+```
+
+### Otras opciones
+
+- **Solo estático (GitHub Pages / cualquier CDN).** `npm run build` genera `dist/`.
+  El juego funciona completo; el ranking cae a `localStorage`. Si quieres ranking
+  global desde un sitio estático, despliega la API en Vercel y apunta el cliente
+  con `VITE_API_URL=https://tu-app.vercel.app/api/leaderboard`.
+
+## Variables de entorno
+
+| Variable | Descripción | Por defecto |
+| --- | --- | --- |
+| `DATABASE_URL` | Cadena de conexión de Neon (lado servidor). | — (memoria) |
+| `VITE_SOLANA_RPC` | Endpoint RPC de Solana. | `https://api.devnet.solana.com` |
+| `VITE_SOLANA_CLUSTER` | Cluster mostrado en la UI. | `devnet` |
+| `VITE_API_URL` | URL de la API de ranking. | `/api/leaderboard` |
+
+## Notas
+
+- La simulación de partículas y toda la lógica de juego (movimiento, colisiones,
+  puntuación, brechas) se ejecuta en la GPU y está verificada de extremo a extremo.
+  El render a canvas requiere WebGPU real; algunos entornos *headless* por software
+  no soportan la presentación a canvas.
+- El landing anterior de la memecoin sigue en el repo como [`src/App.jsx`](src/App.jsx)
+  (ya no se usa; el punto de entrada ahora es [`src/GameApp.jsx`](src/GameApp.jsx)).
 
 ---
 
-*$SIEGE es un token comunitario de utilidad, sin garantía de valor ni de
-retorno. Nada en esta página es asesoría financiera.*
+*Demo educativa. La integración con Solana usa **devnet** y no mueve fondos
+reales; nada de esto es asesoría financiera.*
