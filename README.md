@@ -1,33 +1,35 @@
-# ⚔ Siege Kingdoms — $SIEGE
+# ROGUE · $ROGUE — landing page
 
-Landing page de la memecoin **Siege Kingdoms**, construida con **React + Vite**.
+> rob the whales, feed the degens
 
-La interfaz vive en un único componente: [`src/App.jsx`](src/App.jsx). Usa
-utilidades de Tailwind (vía Play CDN) para el layout, fuentes de Google
-(Baloo 2 / Manrope / Space Mono) y varios efectos de animación
-(BlurText, ScrollReveal, Marquee, CountUp, tarjetas con tilt, etc.).
+A landing page for **ROGUE**, a 10-minute on-chain lottery: you trade, the tax
+fills the pot, and every 10 minutes a random buyer robs it all. Same mechanic
+and sections as the reference (robinloot.xyz), rebuilt with an original brand
+and an uncommon **warm editorial** palette (ivory / clay / gold / vermilion) —
+deliberately not the usual neon-on-black crypto look.
 
-## Desarrollo local
+## Stack
+- **Vite + React 18**
+- **Tailwind CSS** (custom warm palette + type scale)
+- **Framer Motion** — per-element entry animations on every section
+- **Iconoir** — an uncommon icon set (mask, coins, hourglass…)
+- Fonts: **Bricolage Grotesque** (display), **Instrument Serif** (accent),
+  **Space Grotesk** (body), **Space Mono** (labels / addresses)
 
+## Sections
+Nav + connect wallet · Hero · **live Active Round dashboard** (pot, countdown,
+seed, players) · interactive Buy panel (tax → pot, tickets) · How it works
+(5 steps) · Recent winners (live) · Distributed-to-players stats · Footer.
+
+The live values are driven by a self-contained simulation in
+`src/lib/useRound.js`. To go on-chain, replace that hook with an RPC read of the
+token's tax pot + round state — the data shape stays identical. Wallet connect
+(`src/lib/useWallet.js`) already uses `window.ethereum` when present and falls
+back to a demo address otherwise.
+
+## Develop
 ```bash
 npm install
-npm run dev      # servidor de desarrollo
-npm run build    # genera la versión de producción en dist/
-npm run preview  # sirve la build localmente
+npm run dev
+npm run build
 ```
-
-## Despliegue
-
-Cada push a la rama `claude/web-page-github-376yuj` dispara el workflow
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), que compila el
-sitio y lo publica en **GitHub Pages**:
-
-<https://cacereslucianoljc5-cmyk.github.io/clash3deee/>
-
-> Nota: `vite.config.js` fija `base: '/clash3deee/'` para que las rutas de los
-> assets funcionen bajo el subdirectorio del repositorio en GitHub Pages.
-
----
-
-*$SIEGE es un token comunitario de utilidad, sin garantía de valor ni de
-retorno. Nada en esta página es asesoría financiera.*
