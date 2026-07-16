@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-paper text-ink font-sans antialiased;
+  font-feature-settings: 'ss01', 'cv01';
+  /* Soft warm paper texture — very low-contrast, no harsh colors */
+  background-color: #F4ECDF;
+  background-image:
+    radial-gradient(1200px 600px at 12% -8%, rgba(217, 168, 130, 0.35), transparent 60%),
+    radial-gradient(1000px 560px at 92% 4%, rgba(230, 194, 122, 0.28), transparent 62%),
+    radial-gradient(900px 700px at 80% 100%, rgba(108, 74, 94, 0.10), transparent 60%);
+  background-attachment: fixed;
+}
+
+/* Fine grain overlay for an editorial, printed feel */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+::selection {
+  background: #D5442A;
+  color: #FCF8F0;
+}
+
+/* Big tabular numerals for money/timer readouts */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.02em;
+}
+
+.font-display {
+  letter-spacing: -0.03em;
+}
+
+/* Thin scrollbar in warm tones */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: #EEE3D0; }
+::-webkit-scrollbar-thumb { background: #D9A882; border-radius: 999px; border: 3px solid #EEE3D0; }
+::-webkit-scrollbar-thumb:hover { background: #B26B45; }
+
+/* Dashed ticket edge */
+.ticket-notch {
+  -webkit-mask:
+    radial-gradient(11px at 0 50%, transparent 98%, #000) left,
+    radial-gradient(11px at 100% 50%, transparent 98%, #000) right;
+  -webkit-mask-size: 51% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask:
+    radial-gradient(11px at 0 50%, transparent 98%, #000) left,
+    radial-gradient(11px at 100% 50%, transparent 98%, #000) right;
+  mask-size: 51% 100%;
+  mask-repeat: no-repeat;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
